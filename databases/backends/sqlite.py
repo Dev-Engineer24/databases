@@ -29,8 +29,7 @@ class SQLiteBackend(DatabaseBackend):
         self._dialect.supports_native_decimal = False
         self._pool = SQLitePool(self._database_url, **self._options)
 
-    async def connect(self) -> None:
-        ...
+    async def connect(self) -> None: ...
 
     async def disconnect(self) -> None:
         # if it extsis, remove reference to connection to cached in-memory database on disconnect
@@ -49,10 +48,15 @@ class SQLitePool:
     def __init__(self, url: DatabaseURL, **options: typing.Any) -> None:
         self._database = url.database
         self._memref = None
+        self._options = dict(options)
         # add query params to database connection string
         if url.options:
+            if not self._database.startswith("file:"):
+                self._database = f"file:{self._database}"
             self._database += "?" + urlencode(url.options)
-        self._options = options
+            self._options.setdefault("uri", True)
+        elif self._options.get("uri") and not self._database.startswith("file:"):
+            self._database = f"file:{self._database}"
 
         if url.options and "cache" in url.options:
             # reference to a connection to the cached in-memory database must be held to keep it from being deleted

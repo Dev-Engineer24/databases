@@ -1721,3 +1721,28 @@ async def test_mapping_property_interface(database_url):
         list_result = await database.fetch_all(query=query)
         assert list_result[0]._mapping["text"] == "example1"
         assert list_result[0]._mapping["completed"] is True
+
+
+@async_adapter
+async def test_sqlite_uri_query_params(tmp_path):
+    db_file = tmp_path / "test_ro.db"
+    async with Database(f"sqlite:///{db_file}") as database:
+        query = sqlalchemy.schema.CreateTable(notes)
+        await database.execute(query)
+
+        query = notes.insert()
+        values = {"text": "example1", "completed": True}
+        await database.execute(query, values)
+
+    # Connect with mode=ro via query parameters
+    async with Database(f"sqlite:///{db_file}?mode=ro") as database:
+        query = notes.select()
+        rows = await database.fetch_all(query=query)
+        assert len(rows) == 1
+        assert rows[0].text == "example1"
+
+        # Read-only database must reject write operations
+        with pytest.raises(sqlite3.OperationalError):
+            await database.execute(
+                notes.insert(), {"text": "example2", "completed": False}
+            )
